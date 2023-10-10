@@ -2,14 +2,25 @@
 # bin/compile
 # set -x
 
+BUILD_DIR=$1
 ENV_DIR=$3
 TRANSCRYPT_PASSWORD=$(cat $ENV_DIR/TRANSCRYPT_PASSWORD)
+
+pushd () {
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    command popd "$@" > /dev/null
+}
 
 if [ -z $TRANSCRYPT_PASSWORD ]
 then
 	echo 'You should export a $TRANSCRYPT_PASSWORD. If you do not have it, ask someone to run ./bin/transcrypt -d'
 	exit 1
 fi
+
+pushd $BUILD_DIR
 
 # It doesn't have git, so initialize
 git init . --quiet
@@ -20,5 +31,7 @@ git init . --quiet
 # Decrypt the encrypted files
 git ls-crypt | \
 xargs -0 -I{} sh -c "echo '-----> Decrypting {}'; cat {} | .git/crypt/transcrypt smudge > {}.dec && mv {}.dec {}"
+
+popd
 
 echo "-----> All transcrypted files decrypted!"

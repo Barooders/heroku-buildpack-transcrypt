@@ -1,46 +1,24 @@
 #!/usr/bin/env bash
-# bin/compile <build-dir> <cache-dir>
+# bin/compile
 # set -x
-TRANSCRYPT_CMD=$(echo $RECEIVE_DATA | bin/jq -r .push_metadata.env.TRANSCRYPT_CMD)
-: ${TRANSCRYPT_CMD:?Please run the following: heroku config:set TRANSCRYPT_CMD='"''$(transcrypt -d | grep "transcrypt -c" | sed '"'"'s/^  //'"'"')''"'}
 
-build_dir=$1
-cache_dir=$2
+ENV_DIR=$3
+TRANSCRYPT_PASSWORD=$(cat $ENV_DIR/TRANSCRYPT_PASSWORD)
 
-pushd () {
-    command pushd "$@" > /dev/null
-}
-
-popd () {
-    command popd "$@" > /dev/null
-}
-
-mkdir -p $cache_dir
-pushd $cache_dir
-if [ -d "transcrypt" ]; then
-  pushd transcrypt
-  git fetch --quiet
-  git pull --quiet
-  popd
-else
-  git clone --quiet https://github.com/elasticdog/transcrypt.git
+if [ -z $TRANSCRYPT_PASSWORD ]
+then
+	echo 'You should export a $TRANSCRYPT_PASSWORD. If you do not have it, ask someone to run ./bin/transcrypt -d'
+	exit 1
 fi
-popd
 
-pushd $build_dir
 # It doesn't have git, so initialize
 git init . --quiet
 
 # Install transcrypt, its helper utils, and password/cipher
-eval $cache_dir/transcrypt/$TRANSCRYPT_CMD -y > /dev/null
+./bin/transcrypt -y -c aes-256-cbc -p $TRANSCRYPT_PASSWORD
 
 # Decrypt the encrypted files
-cat .gitattributes | \
-grep "filter=crypt diff=crypt" | \
-grep -v "^#" | \
-sed 's/filter=crypt diff=crypt//;s/ //g' | \
-tr '\n' '\0' | \
-xargs -0 -I{} sh -c "echo '-----> Decrypting {}'; cat {} | .git/crypt/smudge > {}.dec && mv {}.dec {}"
-popd
+git ls-crypt | \
+xargs -0 -I{} sh -c "echo '-----> Decrypting {}'; cat {} | .git/crypt/transcrypt smudge > {}.dec && mv {}.dec {}"
 
 echo "-----> All transcrypted files decrypted!"

@@ -29,7 +29,11 @@ git init . --quiet
 ./bin/transcrypt -y -c aes-256-cbc -p $TRANSCRYPT_PASSWORD
 
 # Decrypt the encrypted files
-git ls-crypt | \
+cat .gitattributes | \
+grep "filter=crypt diff=crypt merge=crypt" | \
+grep -v "^#" | \
+sed 's/filter=crypt diff=crypt merge=crypt//;s/ //g' | \
+tr '\n' '\0' | \
 xargs -0 -I{} sh -c "echo '-----> Decrypting {}'; cat {} | .git/crypt/transcrypt smudge > {}.dec && mv {}.dec {}"
 
 popd
